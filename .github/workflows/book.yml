@@ -1,0 +1,73 @@
+name: Book class
+
+on:
+  workflow_dispatch:
+    inputs:
+      booking_rules:
+        description: "Każda linia: NAZWA | DZIEŃ | GODZINA"
+        required: false
+        default: ""
+      days_ahead:
+        description: "Ile dni do przodu"
+        required: false
+        default: "7"
+
+  schedule:
+    - cron: "17 0 * * *"
+      timezone: "Europe/Warsaw"
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          python -m playwright install chromium
+
+      - name: Prepare env
+        shell: bash
+        run: |
+          echo "EFITNESS_LOGIN=${{ secrets.EFITNESS_LOGIN }}" >> $GITHUB_ENV
+          echo "EFITNESS_PASSWORD=${{ secrets.EFITNESS_PASSWORD }}" >> $GITHUB_ENV
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.booking_rules }}" ]; then
+            {
+              echo "BOOKING_RULES<<EOF"
+              echo "${{ github.event.inputs.booking_rules }}"
+              echo "EOF"
+            } >> $GITHUB_ENV
+          else
+            {
+              echo "BOOKING_RULES<<EOF"
+              echo "${{ secrets.BOOKING_RULES }}"
+              echo "EOF"
+            } >> $GITHUB_ENV
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.days_ahead }}" ]; then
+            echo "DAYS_AHEAD=${{ github.event.inputs.days_ahead }}" >> $GITHUB_ENV
+          else
+            echo "DAYS_AHEAD=${{ secrets.DAYS_AHEAD }}" >> $GITHUB_ENV
+          fi
+
+      - name: Run booking
+        run: python book.py
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: booking-debug
+          path: output/
+          if-no-files-found: ignore
