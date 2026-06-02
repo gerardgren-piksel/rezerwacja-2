@@ -13,9 +13,8 @@ on:
         default: "7"
 
   schedule:
-    - cron: "17 0 * * *"
-      timezone: "Europe/Warsaw"
-    - cron: "*/5 * * * *"
+    # 00:17 czasu polskiego latem (UTC+2)
+    - cron: "17 22 * * *"
 
 jobs:
   book:
@@ -42,25 +41,27 @@ jobs:
           echo "EFITNESS_LOGIN=${{ secrets.EFITNESS_LOGIN }}" >> $GITHUB_ENV
           echo "EFITNESS_PASSWORD=${{ secrets.EFITNESS_PASSWORD }}" >> $GITHUB_ENV
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.booking_rules }}" ]; then
-            {
-              echo "BOOKING_RULES<<EOF"
+          {
+            echo "BOOKING_RULES<<EOF"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.booking_rules }}" ]; then
               echo "${{ github.event.inputs.booking_rules }}"
-              echo "EOF"
-            } >> $GITHUB_ENV
-          else
-            {
-              echo "BOOKING_RULES<<EOF"
-              echo "${{ secrets.BOOKING_RULES }}"
-              echo "EOF"
-            } >> $GITHUB_ENV
-          fi
+            else
+              echo "${{ vars.BOOKING_RULES }}"
+            fi
+            echo "EOF"
+          } >> $GITHUB_ENV
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.days_ahead }}" ]; then
             echo "DAYS_AHEAD=${{ github.event.inputs.days_ahead }}" >> $GITHUB_ENV
           else
-            echo "DAYS_AHEAD=${{ secrets.DAYS_AHEAD }}" >> $GITHUB_ENV
+            echo "DAYS_AHEAD=7" >> $GITHUB_ENV
           fi
+
+      - name: Debug variables
+        run: |
+          echo "DAYS_AHEAD=$DAYS_AHEAD"
+          echo "BOOKING_RULES:"
+          echo "$BOOKING_RULES"
 
       - name: Run booking
         run: python book.py
